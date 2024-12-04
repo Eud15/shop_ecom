@@ -2,19 +2,22 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
+from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
 from .models import Category, Product, Cart, CartItem, Order, OrderItem
-from django.contrib.auth.models import User
-
 from .serializers import (
-    CategorySerializer, ProductSerializer, CartSerializer,
-    CartItemSerializer, OrderSerializer, UserSerializer
+    CategoryListSerializer, CategoryDetailSerializer, ProductSerializer, 
+    CartSerializer, CartItemSerializer, OrderSerializer, UserSerializer
 )
 
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
-    serializer_class = CategorySerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return CategoryDetailSerializer
+        return CategoryListSerializer
 
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()

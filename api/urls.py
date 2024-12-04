@@ -7,10 +7,11 @@ from rest_framework_simplejwt.views import (
 from .views import (
     CategoryViewSet,
     ProductViewSet,
-    CartViewSet,
     OrderViewSet,
     UserViewSet,
 )
+from .cart_views import CartViewSet
+from .customer_views import CustomerViewSet
 
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet)
@@ -18,6 +19,7 @@ router.register(r'products', ProductViewSet)
 router.register(r'carts', CartViewSet, basename='cart')
 router.register(r'orders', OrderViewSet, basename='order')
 router.register(r'users', UserViewSet)
+router.register(r'customers', CustomerViewSet, basename='customer')
 
 urlpatterns = [
     path('', include(router.urls)),
