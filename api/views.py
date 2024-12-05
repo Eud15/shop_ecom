@@ -1,5 +1,5 @@
 from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth.models import User
@@ -10,6 +10,77 @@ from .serializers import (
     CartSerializer, CartItemSerializer, OrderSerializer, UserSerializer
 )
 
+from .permissions import IsAdminOrOwner, IsAdminUser
+from .user_utils import get_user_details, check_user_permissions
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_user_role(request):
+    """
+    Get the role of the current user
+    """
+    user_details = get_user_details(request.user)
+    return Response(user_details)
+
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [IsAdminUser]
+        elif self.action == 'create':
+            permission_classes = [permissions.AllowAny]
+        else:
+            permission_classes = [IsAdminOrOwner]
+        return [permission() for permission in permission_classes]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        Cart.objects.create(user=user)
+        return Response(
+            UserSerializer(user).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=False, methods=['get'])
+    def current(self, request):
+        """
+        Get current user's details including their role
+        """
+        user_details = get_user_details(request.user)
+        return Response(user_details)
+
+    @action(detail=False, methods=['get'])
+    def customers(self, request):
+        """
+        Get list of all customers (staff only)
+        """
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Staff access required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        customers = User.objects.filter(is_staff=False)
+        serializer = UserSerializer(customers, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def staff(self, request):
+        """
+        Get list of all staff members (staff only)
+        """
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Staff access required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        staff = User.objects.filter(is_staff=True)
+        serializer = UserSerializer(staff, many=True)
+        return Response(serializer.data)
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]

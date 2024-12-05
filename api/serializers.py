@@ -4,13 +4,18 @@ from .models import Category, Product, Cart, CartItem, Order, OrderItem
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from .cart_utils import calculate_cart_total
-
+from .user_utils import get_user_role
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
+    role = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'password')
+        fields = ('id', 'username', 'email', 'password', 'role', 'date_joined', 'last_login')
+        read_only_fields = ('role', 'date_joined', 'last_login')
+
+    def get_role(self, obj):
+        return get_user_role(obj)
 
     def create(self, validated_data):
         user = User.objects.create_user(
@@ -19,6 +24,20 @@ class UserSerializer(serializers.ModelSerializer):
             password=validated_data['password']
         )
         return user
+# class UserSerializer(serializers.ModelSerializer):
+#     password = serializers.CharField(write_only=True)
+
+#     class Meta:
+#         model = User
+#         fields = ('id', 'username', 'email', 'password')
+
+#     def create(self, validated_data):
+#         user = User.objects.create_user(
+#             username=validated_data['username'],
+#             email=validated_data.get('email', ''),
+#             password=validated_data['password']
+#         )
+#         return user
 
 # class UserRegistrationSerializer(serializers.ModelSerializer):
 #     password = serializers.CharField(write_only=True, required=True)
@@ -100,7 +119,7 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = ('id', 'category', 'category_name', 'name','image_url', 'description', 
-                 'price', 'stock', 'created_at', 'updated_at')
+                 'price', 'stock','created_at', 'updated_at')
 
 class CategoryDetailSerializer(serializers.ModelSerializer):
     products = ProductSerializer(many=True, read_only=True)
@@ -118,7 +137,7 @@ class CategoryListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ('id', 'name', 'description','image_url', 'created_at', 'products_count')
+        fields = ('id', 'name', 'description','image_url', 'created_at', 'products_count', 'products')
 
     def get_products_count(self, obj):
         return obj.products.count()

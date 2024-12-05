@@ -1,41 +1,38 @@
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.contrib.auth.models import User
-from django.db.models import Prefetch, Count, Sum, F
-from .models import Cart, Order
-from .serializers import CustomerWithCartSerializer
+from .customer_serializers import CustomerWithCartSerializer
+from .customer_utils import get_customers_with_carts
+from .permissions import IsAdminUser
 
-class CustomerViewSet(viewsets.ReadOnlyModelViewSet):
+class CustomerManagementViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    ViewSet for viewing customer information with their carts.
+    ViewSet for managing customers and their carts.
     Only accessible by admin users.
     """
-    permission_classes = [permissions.IsAdminUser]
     serializer_class = CustomerWithCartSerializer
-
+    permission_classes = [IsAdminUser]
+    
     def get_queryset(self):
-        return User.objects.filter(is_staff=False).select_related(
-            'cart'
-        ).prefetch_related(
-            Prefetch(
-                'cart__items',
-                queryset=Cart.objects.prefetch_related('items__product')
-            ),
-            Prefetch(
-                'order_set',
-                queryset=Order.objects.order_by('-created_at')
-            )
-        ).annotate(
-            orders_count=Count('order'),
-            total_spent=Sum('order__total_amount', filter=F('order__status') == 'delivered')
-        )
+        return get_customers_with_carts()
 
     @action(detail=True, methods=['get'])
-    def orders(self, request, pk=None):
-        """Get all orders for a specific customer"""
+    def cart_details(self, request, pk=None):
+        """Get detailed cart information for a specific customer"""
         customer = self.get_object()
-        orders = Order.objects.filter(user=customer).order_by('-created_at')
-        from .serializers import OrderSerializer
-        serializer = OrderSerializer(orders, many=True)
+        serializer = self.get_serializer(customer)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def active_carts(self, request):
+        """Get customers with non-empty carts"""
+        customers = self.get_queryset().filter(cart__items__isnull=False).distinct()
+        serializer = self.get_serializer(customers, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def inactive_carts(self, request):
+        """Get customers with empty carts"""
+        customers = self.get_queryset().filter(cart__items__isnull=True)
+        serializer = self.get_serializer(customers, many=True)
         return Response(serializer.data)
